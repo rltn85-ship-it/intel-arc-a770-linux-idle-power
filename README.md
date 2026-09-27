@@ -312,3 +312,23 @@ If your GPU cannot reach `D3hot` even with `power/control=auto` and no active cl
 ## License
 
 MIT
+
+
+## 2026-09-28 extended findings
+
+Further tracing on the same A770 LE / X99 server found several additional causes of unwanted wakeups and clarified an important limitation:
+
+- **DRM connector polling** was waking the GPU periodically. ftrace showed a path through `output_poll_execute -> intel_dp_detect -> xe_pm_runtime_resume`. Temporarily setting `/sys/module/drm_kms_helper/parameters/poll` to `N` reduced active residency substantially on this headless system.
+- A custom idle monitor was reading Xe `act_freq` even while the GPU was already runtime-suspended. ftrace showed `act_freq_show -> xe_pm_runtime_get -> rpm_resume`. The monitor was changed to read `runtime_status` first and skip frequency reads while suspended.
+- **ComfyUI holds the render node open while running.** Two open file descriptors to `/dev/dri/renderD128` corresponded to `runtime_usage=2`, keeping the GPU in `D0`. Stopping ComfyUI allowed `runtime_usage=0` and `D3hot`.
+- After the wake sources above were removed, runtime active residency fell from roughly **11–12 s/min** to about **1–2 s/min** in the observed tests.
+- However, the Xe `energy2_input` package counter still indicated roughly **35 W average** even during long intervals where runtime PM reported almost continuous `D3hot`. This suggests that **runtime D3hot alone does not guarantee low board/package idle power** on this platform.
+- PCIe inspection showed the X99 root port had ordinary **ASPM L1** but no visible **L1 Substates capability**, while the A770 internal bridge advertised L1.1/L1.2 support but had those substates disabled. The firmware ACPI FADT also told Linux that ASPM is unsupported, so Linux used BIOS configuration and would not allow changing the ASPM policy at runtime.
+
+See [docs/x99-a770-idle-debug-2026-09-28.md](docs/x99-a770-idle-debug-2026-09-28.md) for the detailed trace and measurements.
+
+### Updated practical conclusion
+
+On this specific X99 platform, the software-side runtime-PM behavior can be made clean and sleep-aware, but the remaining ~35 W package idle reading appears tied to platform/firmware PCIe power-management limitations rather than ordinary userspace polling alone.
+
+Do not assume that forcing `pcie_aspm=force` is safe. It can enable ASPM on links that firmware did not expose as safe and may cause instability. Prefer firmware/BIOS support for Native ASPM and L1 Substates, or a newer platform that exposes those capabilities correctly.
