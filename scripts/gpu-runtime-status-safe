@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+find_gpu() {
+  for card in /sys/class/drm/card[0-9]*; do
+    [ -e "$card/device/vendor" ] || continue
+    [ "$(cat "$card/device/vendor" 2>/dev/null)" = "0x8086" ] || continue
+
+    class="$(cat "$card/device/class" 2>/dev/null || true)"
+    case "$class" in
+      0x03*) readlink -f "$card/device"; return 0 ;;
+    esac
+  done
+  return 1
+}
+
+read_safe() {
+  local path="$1"
+  if [ -r "$path" ]; then
+    cat "$path"
+  else
+    printf 'unavailable
+'
+  fi
+}
+
+GPU_DEV="$(find_gpu || true)"
+
+if [ -z "$GPU_DEV" ]; then
+  echo "Intel display-class DRM device not found" >&2
+  exit 1
+fi
+
+DRIVER="unavailable"
+if [ -L "$GPU_DEV/driver" ]; then
+  DRIVER="$(basename "$(readlink -f "$GPU_DEV/driver")")"
+fi
+
+echo "pci_address=$(basename "$GPU_DEV")"
+echo "driver=$DRIVER"
+echo "control=$(read_safe "$GPU_DEV/power/control")"
+echo "runtime_status=$(read_safe "$GPU_DEV/power/runtime_status")"
+echo "runtime_usage=$(read_safe "$GPU_DEV/power/runtime_usage")"
+echo "runtime_active_time_ms=$(read_safe "$GPU_DEV/power/runtime_active_time")"
+echo "runtime_suspended_time_ms=$(read_safe "$GPU_DEV/power/runtime_suspended_time")"
+echo "autosuspend_delay_ms=$(read_safe "$GPU_DEV/power/autosuspend_delay_ms")"
+echo "power_state=$(read_safe "$GPU_DEV/power_state")"
+echo "d3cold_allowed=$(read_safe "$GPU_DEV/d3cold_allowed")"
