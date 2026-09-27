@@ -1,0 +1,11 @@
+[Unit]
+Description=Enable runtime PM for Intel Arc GPU
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/enable-intel-gpu-runtime-pm
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
