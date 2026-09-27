@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+find_gpu() {
+  for card in /sys/class/drm/card[0-9]*; do
+    [ -e "$card/device/vendor" ] || continue
+    [ "$(cat "$card/device/vendor" 2>/dev/null)" = "0x8086" ] || continue
+
+    class="$(cat "$card/device/class" 2>/dev/null || true)"
+    case "$class" in
+      0x03*) readlink -f "$card/device"; return 0 ;;
+    esac
+  done
+  return 1
+}
+
+GPU_DEV="$(find_gpu || true)"
+
+if [ -z "$GPU_DEV" ]; then
+  echo "Intel display-class DRM device not found" >&2
+  exit 1
+fi
+
+CONTROL="$GPU_DEV/power/control"
+
+if [ ! -w "$CONTROL" ]; then
+  echo "Cannot write $CONTROL (run as root)" >&2
+  exit 1
+fi
+
+printf 'auto
+' > "$CONTROL"
+echo "Enabled runtime PM for $(basename "$GPU_DEV")"
