@@ -332,3 +332,12 @@ See [docs/x99-a770-idle-debug-2026-09-28.md](docs/x99-a770-idle-debug-2026-09-28
 On this specific X99 platform, the software-side runtime-PM behavior can be made clean and sleep-aware, but the remaining ~35 W package idle reading appears tied to platform/firmware PCIe power-management limitations rather than ordinary userspace polling alone.
 
 Do not assume that forcing `pcie_aspm=force` is safe. It can enable ASPM on links that firmware did not expose as safe and may cause instability. Prefer firmware/BIOS support for Native ASPM and L1 Substates, or a newer platform that exposes those capabilities correctly.
+
+
+## 2026-10-02 hardware bring-up and migration lessons
+
+A broader follow-up note is available here:
+
+- [Old workstation + Intel Arc A770 headless AI server: hardware bring-up lessons](docs/hardware-bringup-migration-lessons-2026-10-02.md)
+
+It covers the hardware-side lessons that accumulated beyond GPU idle power: failed HP Z440 migration, one-second power cut fault isolation, headless boot assumptions, dynamic PCI/DRM/NIC/storage discovery, PCI subsystem vendor identification, `update-pciids`, driver-reported GPU power limits, kernel fallbacks, and avoiding hardware-specific hard-coding in monitoring software.
