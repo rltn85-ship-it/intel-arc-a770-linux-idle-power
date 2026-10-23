@@ -350,3 +350,5 @@ It covers the hardware-side lessons that accumulated beyond GPU idle power: fail
 This Linux-native firmware flashing workflow adapts the [HP Z440/Z640/Z840 BIOS mod project](https://github.com/bibikalka1/HP_Z440_Z640_Z840_BIOS_mod) and [ReBarUEFI](https://github.com/xCuri0/ReBarUEFI). On the tested HP Z440 (M60 v02.61 / Xeon E5-2673 v4 / Ubuntu 22.04), **both** A770 16GB GPUs reached **BAR2 16GB** (previously 256MB). The write used Linux `flashrom` after physical jumper configuration and S3 suspend/resume; the `ReBarState` utility was built natively on Linux. The documentation includes exact verification outputs, BIOS UI path, backups, risks, troubleshooting, and a Korean summary.
 
 **한국어:** HP Z440에서 Windows FPT가 아닌 **Linux flashrom 기반으로 개조 BIOS를 적용**했고, `PCIe MMIO Assignment Mode = 64 Bit` 및 `ReBarState = 14` 설정으로 **Arc A770 16GB 두 장 모두 ReBAR 16GB 활성화**를 확인했습니다. 자세한 절차 및 주의사항은 위 링크를 참조하세요. 펌웨어 기록은 시스템을 벽돌로 만들 수 있으므로 원본 백업과 복구 방법을 먼저 확보하세요.
+
+- [HP Z440 Linux ReBAR: download links, original Windows flashing tools, and safety checklist](docs/hp-z440-linux-rebar-downloads-checklist.md)
