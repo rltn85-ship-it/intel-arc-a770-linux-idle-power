@@ -255,6 +255,55 @@ The second GPU was temporarily absent from `lspci` **because its auxiliary PCIe 
 | ReBAR works on one GPU | Verify every physical GPU individually with `lspci -vv -s 04:00.0` and `-s 08:00.0` |
 | Network DHCP fails following firmware work | In this test an upstream networking device power cycle resolved it; it was **not** established as a ReBAR problem |
 
+
+## Additional reproducibility checklist (read before attempting)
+
+The case above is a record of **one successful workstation**, not a turnkey Linux flash utility. For another Z440, the following distinctions matter:
+
+### What the patched image does vs. what ReBarState does
+
+The upstream **modified BIOS/reference** provides firmware-side changes needed for the ReBAR workflow. The Linux-built **ReBarState** program then writes an **EFI variable selecting the maximum BAR aperture**; it does not itself install the modified DXE driver or patch the SPI flash. Thus, running ReBarState alone on an unmodified incompatible BIOS may not activate ReBAR. Verify the upstream image's specific contents and compatibility rather than assuming an arbitrary image contains the same modifications.
+
+The work here reproduced the *upstream patch's observed region-copy operation*, not a full source-level reconstruction or audit of all proprietary firmware modules. An `UEFIExtract` structural comparison and a successful single-machine boot do not constitute a cryptographic or security audit.
+
+### Diagnostics to save before and after
+
+Record output to private local logs **before** modifications, again after BIOS modification, and after ReBarState (avoid publishing serials, MAC addresses or full SPI images):
+
+```bash
+sudo dmidecode -s bios-version
+sudo dmidecode -s baseboard-product-name
+uname -r
+cat /proc/cmdline
+mokutil --sb-state 2>/dev/null || true
+lspci -nn | grep -Ei 'VGA|Display'
+sudo lspci -vv | grep -E 'Arc A770|Physical Resizable BAR|BAR 2: current size'
+sudo dmesg | grep -Ei 'rebar|resize.*bar|lmem bar|no space|pci.*resource' | tail -80
+```
+
+`dmesg` may contain unrelated errors; interpret them against the matching PCI BDF (e.g. `04:00.0`, `08:00.0`). Device numbers are not fixed across slot changes or boots.
+
+### SPI write-protection and suspend caveat
+
+The successful combination involved **both physical flash override configuration and a resumed Linux S3 session**; no evidence here establishes that S3 alone removes protection. Check your **own** registers/protected ranges and the exact flashrom chip mapping. In the historical run BIOS write enable/lock and PR registers were inspected, showing `BIOS_CNTL=0x09` and `PR0–PR4=0x0`. Those specific register values are **diagnostic evidence, not instructions to force-register writes**. If your register layout differs, stop and investigate rather than replaying a generic bypass.
+
+`flashrom --ifd -i bios` requests a **descriptor-defined BIOS region**; it is not interchangeable with writing the entire 16 MiB image. Verify how your installed flashrom version handles `--ifd`, region selection, backup and verification. Preserve original Descriptor/ME/NVRAM and validate extracted/targeted regions. Never use this report to justify downgrading or disabling platform security as a routine step.
+
+### Rollback/recovery is not the same as clearing CMOS
+
+Keep an unchanged SPI backup **off the affected workstation** and document a tested method for reaching the SPI flash if the host fails POST. A `ReBarState` failure may involve a persistent EFI variable, PCIe resource allocation or firmware that cannot boot; it cannot always be fixed from Linux because Linux itself may not boot. Clearing CMOS or removing the coin-cell battery is **not guaranteed** to clear the EFI variable. External SPI programming may be necessary, and must match the chip voltage and pinout. Prefer trying a smaller BAR size **only when a working boot/recovery path exists**.
+
+The original transcript confirms two 16 MiB backup copies, BIOS-only flash verify and Linux boot, but **does not independently demonstrate a successful post-failure rollback**. No rollback method is therefore labeled *tested*.
+
+### Compatibility and claims
+
+* Explicitly check **BIOS M60 02.61**, board model, flash part, UEFI boot and MMIO menu availability before replicating.
+* The `PCIe MMIO Assignment Mode=64 Bit` setting was essential on the tested board; it is functionally relevant to high MMIO allocation but should not be assumed to be an exact universal synonym for a dedicated “Above 4G Decoding” option on every firmware.
+* `pci=realloc` was present on the test system; this account does **not isolate** whether it was individually required for the final success.
+* The first 16GB check saw only one GPU because the second card had no auxiliary power. Always verify hardware seating and power before attributing missing devices to firmware.
+* **No isolated before/after benchmark** for ComfyUI, llama.cpp, or games was conducted here; report ReBAR **enabled**, not an unmeasured speedup.
+* The upstream patch and reference files may change. Prefer pinned release assets/commit SHA for any future reproducible experiment; the historical copy offsets above correspond to the reference used in this case.
+
 ## What this report does **not** prove
 
 * Not a generic guaranteed flash method for any Z440 BIOS, Z640 or Z840.
