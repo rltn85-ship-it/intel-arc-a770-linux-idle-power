@@ -44,6 +44,29 @@ The host was headless during normal operation. Note that some A770 board variant
 
 **Compatibility boundary:** The upstream reference and patch were intended for **BIOS 2.61**. Do not apply these exact offsets to a different firmware revision without independent reverse engineering and validation. Do not assume the Z640/Z840 jumpers or address map are identical merely because they are in the upstream project.
 
+## Windows original guide → Linux equivalents (step-by-step)
+
+The [upstream HP Zx40 README](https://github.com/bibikalka1/HP_Z440_Z640_Z840_BIOS_mod#readme) is primarily written for Windows and DOS. This section maps its steps to what can actually be done on Linux, distinguishing the **tested Z440 case** from substitutions that are only broadly feasible. The original upstream steps and physical safety prerequisites still apply.
+
+| Upstream Windows / DOS step | Ubuntu / Linux equivalent | Status on this Z440 |
+| --- | --- | --- |
+| Run administrator CMD | Shell with `sudo` and explicit file permissions | Used |
+| `fptw64.exe -d backup.bin` full flash dump | `sudo flashrom -p internal -c W25Q128.V -r backup.bin` | **Verified**: 16MiB SPI reads and matching same-session SHA256 |
+| Run `patch_bios_v03.ps1` or upstream PowerShell script | Inspect script and reproduce its **version-specific binary range copy** in Python | **Verified** for the recorded v03 range set / reference261 on M60 02.61; not a universal patcher |
+| View firmware with UEFITool / compare with HxD/WinMerge | Linux UEFIExtract / `cmp` / `xxd` / `sha256sum` / Python | **Verified**; structural review cannot guarantee successful boot |
+| Enter Windows sleep and resume to enable BIOS-region write | Confirm `[deep]` at `/sys/power/mem_sleep`; `sudo systemctl suspend`, then resume | **Verified together with jumper changes**; S3 alone is not known to suffice |
+| `fptw64.exe -f file.bin` | `flashrom --ifd -i bios -w <locally validated 16MiB image>` | **Verified** BIOS-region write on one Z440; NOT a full-chip flash and not a generic FPT replacement |
+| DOS boot USB + IMET9 `backup 11` | Read installed SPI from running Linux with `flashrom` | **Verified Linux alternative** on this chip; no DOS necessary in the successful path |
+| Run Windows `ReBarState` EXE | Compile `ReBarUEFI/ReBarState` using `cmake` and run Linux binary | **Verified**, values 12 (4GB) and 14 (16GB) |
+| Verify ReBAR using Windows monitoring tools | `lspci -vv` inspect `BAR 2: current size`; inspect `/proc/iomem`, `dmesg` | **Verified**, both A770 cards at 16GB |
+| Update BIOS/UEFI menus | Direct workstation firmware setup | **OS-independent**, `PCIe MMIO Assignment Mode = 64 Bit` |
+| Move ME/AMT Flash Override and Password jumpers | Physically move documented motherboard jumpers | **OS-independent**; retain physical-access requirement |
+
+**Subtleties:** The original README mentions `patch_bios_v01.ps1` in its quick outline, but the tested comparison here used **`patch_bios_v03.ps1`**. These must not be presumed interchangeable. The Windows PE/FPT dump made during investigation was **not required for the successful Linux `flashrom` write**; it was an extra comparison source. There is **no evidence that all HP Z440 firmware revisions allow software-only flashing**. Do not simply rename the Windows commands; the Intel ME/FPT access and Linux `flashrom` region/lock semantics differ.
+
+**한국어 핵심:** Windows 원본 문서의 관리자 CMD→Linux `sudo`, FPT 백업→`flashrom -r`, PowerShell 바이너리 패치→Python, Windows S3→Ubuntu `systemctl suspend`, FPT 기록→`flashrom --ifd -i bios`, Windows ReBarState→Linux CMake 빌드, GPU-Z 확인→`lspci -vv`로 대체한 실제 Z440 성공 사례입니다. **물리 점퍼·BIOS 화면 설정·복구 장비 준비는 운영체제와 무관하며 생략할 수 없습니다.**
+
+
 ## Linux procedure and decision points
 
 ### 0. Inspect before modifying anything
